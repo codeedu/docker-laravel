@@ -1,5 +1,16 @@
 steps:
 
+- id: "Installing docker-compose"
+  name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/docker-compose:latest'
+  - '.'
+
 - id: "Rodando docker-compose"
   name: 'docker.io/docker/compose'
-  args: ['compose','-f','docker-compose.cloudbuild.yaml','up','-d']
+  args: ['-f','docker-compose.cloudbuild.yaml','up','-d']
+
+images:
+- 'gcr.io/$PROJECT_ID/docker-compose:latest'
