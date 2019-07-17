@@ -27,7 +27,3 @@ steps:
 - id: "Rodando phpunit"
   name: 'gcr.io/cloud-builders/docker'
   args: ['exec','-t','app','php','/var/www/vendor/bin/phpunit','-c','/var/www/phpunit.xml']    
-
-- id: "Building image using Dockerfile.prod"
-  name: 'gcr.io/cloud-builders/docker'
-  args: ['build','-t','gcr.io/$PROJECT_ID/app-laravel:$SHORT_SHA','-f','Dockerfile.prod','.']
