@@ -1,35 +1,82 @@
 steps:
 
-- id: "Rodando docker-compose"
-  name: 'gcr.io/$PROJECT_ID/docker-compose:1.24.0'
+- id: "Running docker-compose"
+  name: 'gcr.io/$PROJECT_ID/docker-compose'
   args: ['-f','docker-compose.cloudbuild.yaml','up','-d']
 
-- id: "Rodando docker ps"
+- id: "Composer"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['ps']
+  args:
+  - 'exec'
+  - '-t'
+  - 'app'
+  - 'composer'
+  - 'install'
 
-- id: "Rodando composer"
+- id: "Copy .env.example"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['exec','-t','app','composer','install']
+  args:
+  - 'exec'
+  - '-t'
+  - 'app'
+  - 'cp'
+  - '.env.example'
+  - '.env'
 
-- id: "Copiando .env"
+- id: "Key Generate"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['exec','-t','app','cp','.env.example','.env']
+  args:
+  - 'exec'
+  - '-t'
+  - 'app'
+  - 'php'
+  - '/var/www/artisan'
+  - 'key:generate'
 
-- id: "Rodando key:generate"
+- id: "Running migrations"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['exec','-t','app','php','/var/www/artisan','key:generate']    
+  args:
+  - 'exec'
+  - '-t'
+  - 'app'
+  - 'php'
+  - '/var/www/artisan'
+  - 'migrate'
 
-- id: "Rodando migrations"
+- id: "Running tests - phpunit"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['exec','-t','app','php','/var/www/artisan','migrate']    
+  args:
+  - 'exec'
+  - '-t'
+  - 'app'
+  - 'php'
+  - '/var/www/vendor/bin/phpunit' 
+  - '-c'
+  - '/var/www/phpunit.xml'
 
-- id: "Rodando phpunit"
+- id: "Building image"
   name: 'gcr.io/cloud-builders/docker'
-  args: ['exec','-t','app','php','/var/www/vendor/bin/phpunit','-c','/var/www/phpunit.xml']    
+  args: ['build','-t','gcr.io/$PROJECT_ID/app-laravel:$SHORT_SHA','-f','Dockerfile.prod','.']
 
-# - id: "Building image using Dockerfile.prod"
-#   name: 'gcr.io/cloud-builders/docker'
-#   args: ['build','-t','gcr.io/$PROJECT_ID/app-laravel:$SHORT_SHA','-f','Dockerfile.prod','.']
+- id: "Pushing  Image"
+  name: 'gcr.io/cloud-builders/docker'
+  args: ['push','gcr.io/$PROJECT_ID/app-laravel:$SHORT_SHA']
 
- 
+- id: Ajust deployment for kubectl
+  name: 'gcr.io/cloud-builders/gcloud'  
+  entrypoint: '/bin/sh'  
+  args:
+    - '-c'
+    - |
+      sed 's#img-app-deployment#gcr.io/$PROJECT_ID/app-laravel:$SHORT_SHA#g' ./k8s/app-deployment.yaml > k8s/app-deployment-new.yaml; 
+      cat k8s/app-deployment-new.yaml;
+
+- id: "Deploying to kubernetes"
+  name: 'gcr.io/cloud-builders/kubectl'
+  args: 
+  - 'apply'
+  - '-f'
+  - 'k8s/app-deployment-new.yaml'
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-a'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=your-first-cluster-1'
